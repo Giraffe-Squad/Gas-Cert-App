@@ -1,14 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════
-   COLORS
+   COLORS — Orange accent to match the app logo
+   Certificate PDF keeps its own separate color scheme
    ═══════════════════════════════════════════════════════════════ */
 export const COLORS = {
-  primary: "#0c1f3f",
-  accent: "#1565c0",
-  accentBg: "#e3f2fd",
+  primary: "#1a1a2e",
+  accent: "#e65100",
+  accentBg: "#fff3e0",
   text: "#1a2b3d",
   muted: "#6b7d8d",
   border: "#dce2e8",
-  bg: "#f4f6f8",
+  bg: "#f9f9fb",
   card: "#ffffff",
   inputBg: "#f8f9fb",
   green: "#2e7d32",
@@ -82,13 +83,13 @@ export const FORM_STEPS = [
 ];
 
 /* ═══════════════════════════════════════════════════════════════
-   FACTORY FUNCTIONS
+   FACTORY FUNCTIONS — UPRN removed
    ═══════════════════════════════════════════════════════════════ */
 export function createEmptyAppliance() {
   return {
     id: Date.now() + Math.random(),
     location: "", make: "", model: "", type: "",
-    serialNo: "", gcNumber: "", flueType: "", operatingPressure: "",
+    flueType: "", operatingPressure: "",
     safetyDevices: "", spillageTest: "", smokePelletTest: "",
     initRatio: "", initCO: "", initCO2: "",
     finalRatio: "", finalCO: "", finalCO2: "",
@@ -107,7 +108,7 @@ export function createEmptyCertificate() {
     },
     prop: {
       name: "", address: "", city: "", county: "",
-      postcode: "", mobile: "", landline: "", email: "", uprn: "",
+      postcode: "", mobile: "", landline: "", email: "",
     },
     inspDate: new Date().toISOString().slice(0, 10),
     nextDate: "",
@@ -115,7 +116,7 @@ export function createEmptyCertificate() {
     ct: "landlord",
     ll: {
       name: "", company: "", address: "", city: "",
-      postcode: "", email: "", phone: "", uprn: "",
+      postcode: "", email: "", phone: "",
     },
     apps: [createEmptyAppliance()],
     pipe: { visualInsp: "", ecvAccessible: "", gasTightness: "", bonding: "" },
@@ -148,8 +149,9 @@ export function saveToStorage(key, value) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   DEFAULT CREDENTIALS
+   CREDENTIALS
    ═══════════════════════════════════════════════════════════════ */
 export const DEFAULT_USERNAME = "mediumlinkuk";
 export const DEFAULT_PASSWORD = "Wajfeb909090@";
 export const MASTER_KEY = "0526";
+export const APP_VERSION = "3.0";
