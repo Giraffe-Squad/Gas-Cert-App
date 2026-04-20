@@ -184,7 +184,16 @@ function AppContent() {
   if (!isLoggedIn) return <LoginPage onLogin={handleLogin} />;
 
   // Actions
-  const startNew = () => { setActiveCert(createEmptyCertificate()); setCurrentStep(1); setSlideDirection(0); setSlideKey(0); setCurrentView("form"); };
+  const startNew = () => {
+    const newCert = createEmptyCertificate();
+    // Auto-generate CP12 number
+    const existingNums = certificates.map(c => {
+      const match = (c.certNo || '').match(/CP12-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    const nextNum = (existingNums.length > 0 ? Math.max(...existingNums) : 0) + 1;
+    newCert.certNo = 'CP12-' + String(nextNum).padStart(4, '0');
+    setActiveCert(newCert); setCurrentStep(1); setSlideDirection(0); setSlideKey(0); setCurrentView("form"); };
   const openCert = (cert, editMode = false) => { setActiveCert({ ...cert }); setCurrentStep(editMode ? 1 : 8); setCurrentView("form"); };
   const saveCert = (status = "draft") => {
     if (!activeCert) return;
@@ -222,7 +231,7 @@ function AppContent() {
               <AppLogo size={56} />
               <div>
                 <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.5 }}>Gas Safety Certificates</h1>
-                <p style={{ fontSize: 15, color: COLORS.accent, margin: 0, marginTop: 2, fontWeight: 600 }}>and More</p>
+                
               </div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -381,7 +390,7 @@ function AppContent() {
         <StepTitle icon={Home} title="Property Address" description="Property being inspected." />
         <ChooseExisting storageKey="cp12_existing_properties" labelField="address" secondaryField="postcode" onSelect={(entry) => { setActiveCert(prev => ({ ...prev, prop: { ...entry } })); toast("Loaded", "success"); }} />
         <div style={appS.grid}>
-          <FormField label="Certificate No." half><input style={componentStyles.input} value={cert.certNo} onChange={e => updateField("certNo", e.target.value)} placeholder="0001" /></FormField>
+          <FormField label="CP12 No." half><input style={componentStyles.input} value={cert.certNo} onChange={e => updateField("certNo", e.target.value)} placeholder="0001" /></FormField>
           <FormField label="No. Appliances" half><input style={{ ...componentStyles.input, background: "#f1f3f5", color: COLORS.muted }} value={cert.apps.length} readOnly /></FormField>
           <FormField label="Name (Tenant / Occupier)"><input style={componentStyles.input} value={cert.prop.name} onChange={e => updateField("prop.name", e.target.value)} placeholder="Tenant name" /></FormField>
           <FormField label="Address" required><input style={componentStyles.input} value={cert.prop.address} onChange={e => updateField("prop.address", e.target.value)} placeholder="12 High Street" /></FormField>
@@ -494,7 +503,7 @@ function AppContent() {
       <div style={appS.container}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => { saveCert("draft"); setCurrentView("dashboard"); }}>
-            <AppLogo size={44} /><div><h1 style={{ fontSize: 18, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.5 }}>Gas Safety Certificates</h1><p style={{ fontSize: 11, color: COLORS.accent, margin: 0, fontWeight: 600 }}>and More</p></div>
+            <AppLogo size={44} /><div><h1 style={{ fontSize: 18, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.5 }}>Gas Safety Certificates</h1><p style={{ fontSize: 11, color: COLORS.muted, margin: 0 }}>CP12 Certificate</p></div>
           </div>
           <button onClick={() => { saveCert("draft"); setCurrentView("dashboard"); }} style={{ ...appS.outBtn, padding: "7px 14px", fontSize: 12 }}><FolderOpen size={14} /> Dashboard</button>
         </div>
