@@ -96,20 +96,32 @@ function ApplianceCard({ appliance, index, onUpdate, onRemove, canRemove }) {
 /* ═══════════════════════════════════════════════════════════════
    SETTINGS PAGE
    ═══════════════════════════════════════════════════════════════ */
-function SettingsPage({ onClose }) {
+function SettingsPage({ onClose, userName, setUserName }) {
   const toast = useToast();
   const [masterKey, setMasterKey] = useState("");
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
+  const [localName, setLocalName] = useState(userName || "");
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)" }}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: 32, maxWidth: 440, width: "90%", boxShadow: "0 24px 64px rgba(0,0,0,.2)", animation: "scaleIn 0.2s ease" }}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: 32, maxWidth: 440, width: "90%", boxShadow: "0 24px 64px rgba(0,0,0,.2)", animation: "scaleIn 0.2s ease", maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={22} color={COLORS.accent} /><h2 style={{ fontSize: 20, fontWeight: 700, color: COLORS.primary, margin: 0 }}>Settings</h2></div>
           <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", color: COLORS.muted, padding: 4 }}><X size={20} /></button>
         </div>
+
+        {/* ── Your Name ── */}
+        <div style={{ marginBottom: 22, padding: "16px 18px", borderRadius: 14, background: COLORS.inputBg, border: `1px solid ${COLORS.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><User size={16} color={COLORS.accent} /><span style={{ fontSize: 13, fontWeight: 700, color: COLORS.primary, textTransform: "uppercase", letterSpacing: 0.8 }}>Your Name</span></div>
+          <p style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10 }}>Shown on the dashboard welcome screen.</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={localName} onChange={e => setLocalName(e.target.value)} placeholder="e.g. Abdullah" style={{ ...componentStyles.input, flex: 1 }} onKeyDown={e => { if (e.key === "Enter") { setUserName(localName.trim()); toast("Name saved!", "success"); }}} />
+            <button onClick={() => { setUserName(localName.trim()); toast("Name saved!", "success"); }} style={{ ...appS.accentBtn, padding: "10px 18px", whiteSpace: "nowrap" }}><Check size={16} /> Save</button>
+          </div>
+        </div>
+        <div style={{ height: 1, background: COLORS.border, margin: "0 0 20px" }} />
         {!unlocked ? (
           <div>
             <p style={{ fontSize: 14, color: COLORS.muted, marginBottom: 16 }}>Enter master key to change login credentials.</p>
@@ -152,23 +164,27 @@ function AppContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [certViewMode, setCertViewMode] = useState("card"); // "card" or "list"
+  const [userName, setUserName] = useState(() => loadFromStorage("cp12_user_name", ""));
 
   // Version migration
   useEffect(() => {
     if (localStorage.getItem("cp12_version") !== APP_VERSION) {
       const un = localStorage.getItem("cp12_username");
       const pw = localStorage.getItem("cp12_password");
+      const nm = localStorage.getItem("cp12_user_name");
       const keys = [];
-      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith("cp12_") && k !== "cp12_username" && k !== "cp12_password") keys.push(k); }
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith("cp12_") && k !== "cp12_username" && k !== "cp12_password" && k !== "cp12_user_name") keys.push(k); }
       keys.forEach(k => localStorage.removeItem(k));
       localStorage.setItem("cp12_version", APP_VERSION);
       if (un) localStorage.setItem("cp12_username", un);
       if (pw) localStorage.setItem("cp12_password", pw);
+      if (nm) localStorage.setItem("cp12_user_name", nm);
     }
   }, []);
 
   useEffect(() => { saveToStorage("cp12_certs", certificates); }, [certificates]);
   useEffect(() => { saveToStorage("cp12_session", isLoggedIn); }, [isLoggedIn]);
+  useEffect(() => { saveToStorage("cp12_user_name", userName); }, [userName]);
   useEffect(() => { if (activeCert?.inspDate) { const d = new Date(activeCert.inspDate); d.setFullYear(d.getFullYear() + 1); updateField("nextDate", d.toISOString().slice(0, 10)); } }, [activeCert?.inspDate]);
 
   const filteredCerts = useMemo(() => {
@@ -226,9 +242,9 @@ function AppContent() {
     return (
       <div style={appS.root}><GlobalStyles /><div style={appS.bgDots} />
         <div style={appS.container}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, animation: "fadeIn 0.5s ease" }}>
             <div>
-              <h1 style={{ fontSize: 30, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.8 }}>Welcome</h1>
+              <h1 style={{ fontSize: 30, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.8 }}>Welcome{userName ? ` ${userName.split(" ")[0]}` : ""}</h1>
               <p style={{ fontSize: 14, color: COLORS.muted, margin: "6px 0 0 0", fontWeight: 500 }}>What would you like to do today?</p>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -263,7 +279,7 @@ function AppContent() {
             <ChevronRight size={22} color={COLORS.muted} />
           </button>
         </div>
-        {showSettings && <SettingsPage onClose={() => setShowSettings(false)} />}
+        {showSettings && <SettingsPage onClose={() => setShowSettings(false)} userName={userName} setUserName={setUserName} />}
       </div>
     );
   }
@@ -326,7 +342,7 @@ function AppContent() {
             const contactName = item.ll?.company || item.ll?.name || "—";
             const contactType = (item.ct || "landlord").charAt(0).toUpperCase() + (item.ct || "landlord").slice(1);
             return (
-              <div key={item.id} style={{ background: COLORS.card, borderRadius: 16, border: `1.5px solid ${COLORS.border}`, padding: 0, marginBottom: 14, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.04)" }}>
+              <div key={item.id} className="cp12-cert-card" style={{ background: COLORS.card, borderRadius: 16, border: `1.5px solid ${COLORS.border}`, padding: 0, marginBottom: 14, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.04)" }}>
                 <div style={{ padding: "8px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", background: item.status === "complete" ? COLORS.greenBg : COLORS.amberBg, borderBottom: `1px solid ${item.status === "complete" ? "#c8e6c9" : "#ffe0b2"}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {item.status === "complete" ? <CheckCircle2 size={16} color={COLORS.green} /> : <FileText size={16} color={COLORS.amber} />}
@@ -360,8 +376,14 @@ function AppContent() {
                 <div style={{ padding: "0 18px 16px", display: "flex", gap: 8 }}>
                   <button onClick={() => openCert(item, true)} style={{ ...appS.outBtn, flex: 1, justifyContent: "center", padding: 10, fontSize: 13 }}><Edit3 size={14} /> Edit</button>
                   <button onClick={() => openCert(item, false)} style={{ ...appS.outBtn, flex: 1, justifyContent: "center", padding: 10, fontSize: 13 }}><FileText size={14} /> View</button>
-                  <button onClick={() => dlPDF(item)} style={{ ...appS.accentBtn, flex: 1, justifyContent: "center", padding: 10, fontSize: 13 }}><Download size={14} /> PDF</button>
-                  <button onClick={() => setDeleteTarget(item.id)} style={{ background: "#fff", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: COLORS.red, display: "flex", alignItems: "center" }}><Trash2 size={14} /></button>
+                  <button onClick={() => dlPDF(item)} className="cp12-download-btn" type="button">
+                    <span className="cp12-dl-text"><Download size={14} /> PDF</span>
+                    <span className="cp12-dl-icon"><Download size={18} strokeWidth={2.5} /></span>
+                  </button>
+                  <button onClick={() => setDeleteTarget(item.id)} className="cp12-delete-btn" type="button">
+                    <span className="cp12-del-text">Delete</span>
+                    <span className="cp12-del-icon"><X size={18} strokeWidth={3} /></span>
+                  </button>
                 </div>
               </div>
             );
@@ -429,7 +451,7 @@ function AppContent() {
       case 4: return (<div>
         <StepTitle icon={Flame} title="Appliance Details" description={`${cert.apps.length} appliance${cert.apps.length > 1 ? "s" : ""} added.`} />
         {cert.apps.map((app, idx) => <ApplianceCard key={app.id} appliance={app} index={idx} onUpdate={updateApp} onRemove={removeApp} canRemove={cert.apps.length > 1} />)}
-        <button onClick={addApp} type="button" style={appS.addBtn}><Plus size={20} /> Add Appliance</button>
+        <button onClick={addApp} type="button" className="cp12-add-appliance-btn" style={appS.addBtn}><Plus size={20} /> Add Appliance</button>
       </div>);
       case 5: return (<div>
         <StepTitle icon={Wrench} title="Pipework & CO Alarms" description="Gas supply and alarm checks." />
@@ -486,14 +508,17 @@ function AppContent() {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 16, padding: "16px 18px", borderRadius: 12, border: "2px solid", textAlign: "center", fontSize: 18, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: isOverallSafe ? COLORS.greenBg : COLORS.redBg, borderColor: isOverallSafe ? "#66bb6a" : "#ef5350", color: isOverallSafe ? COLORS.green : COLORS.red }}>
+        <div className={isOverallSafe ? "cp12-status-pulse" : ""} style={{ marginTop: 16, padding: "16px 18px", borderRadius: 12, border: "2px solid", textAlign: "center", fontSize: 18, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: isOverallSafe ? COLORS.greenBg : COLORS.redBg, borderColor: isOverallSafe ? "#66bb6a" : "#ef5350", color: isOverallSafe ? COLORS.green : COLORS.red }}>
           {isOverallSafe ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />} Overall: {isOverallSafe ? "SATISFACTORY" : cert.apps.some(a => a.appSafeToUse === "No") ? "UNSATISFACTORY" : "INCOMPLETE"}
         </div>
         <div style={{ marginTop: 22, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={() => saveCert("complete")} style={{ ...appS.accentBtn, flex: 1, justifyContent: "center", padding: 14 }}><CheckCircle2 size={17} /> Save Certificate</button>
+          <button onClick={() => saveCert("complete")} className="cp12-save-btn" style={{ ...appS.accentBtn, flex: 1, justifyContent: "center", padding: 14 }}><CheckCircle2 size={17} /> Save Certificate</button>
           <button onClick={() => saveCert("draft")} style={{ ...appS.outBtn, flex: 1, justifyContent: "center", padding: 14 }}><FileText size={17} /> Save Draft</button>
         </div>
-        <button onClick={() => dlPDF(cert)} style={{ ...appS.darkBtn, width: "100%", marginTop: 10, padding: 16, fontSize: 15 }}><Download size={18} /> Download PDF</button>
+        <button onClick={() => dlPDF(cert)} className="cp12-download-btn-full" type="button">
+          <span className="cp12-dlf-text"><Download size={18} /> Download PDF</span>
+          <span className="cp12-dlf-icon"><Download size={22} strokeWidth={2.5} /></span>
+        </button>
         <button onClick={() => { saveCert(cert.status === "complete" ? "complete" : "draft"); setCurrentView("dashboard"); }} style={{ ...appS.outBtn, width: "100%", marginTop: 10, justifyContent: "center", padding: 14 }}><ChevronLeft size={17} /> Back to Dashboard</button>
       </div>);
       default: return null;
@@ -532,7 +557,7 @@ function AppContent() {
           {currentStep < 8 && <button onClick={() => navStep(1)} style={appS.accentBtn} type="button">Continue <ChevronRight size={17} /></button>}
         </div>
       </div>
-      {showSettings && <SettingsPage onClose={() => setShowSettings(false)} />}
+      {showSettings && <SettingsPage onClose={() => setShowSettings(false)} userName={userName} setUserName={setUserName} />}
     </div>
   );
 }

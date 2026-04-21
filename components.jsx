@@ -254,93 +254,162 @@ export function GlobalStyles() {
       @keyframes slideInLeft { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+      @keyframes subtlePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(46,125,50,0); } 50% { box-shadow: 0 0 0 6px rgba(46,125,50,0.12); } }
       input:focus, textarea:focus, select:focus { border-color: ${COLORS.accent} !important; box-shadow: 0 0 0 3px ${COLORS.accent}18 !important; outline: none; }
-      button { transition: all 0.15s ease; font-family: 'Outfit', sans-serif; }
+      button { transition: all 0.2s cubic-bezier(0.23,1,0.32,1); font-family: 'Outfit', sans-serif; }
       button:hover { filter: brightness(1.06); }
       button:active { transform: scale(0.97) !important; }
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-thumb { background: #d0d5db; border-radius: 3px; }
 
-      /* ─── Animated primary CTA button ─── */
+      /* ─── Animated primary CTA — expanding circle fill ─── */
       .cp12-primary-btn {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        padding: 20px 24px;
-        border-radius: 16px;
-        background: ${COLORS.primary};
-        border: none;
-        color: #fff;
-        font-size: 17px;
-        font-weight: 700;
-        cursor: pointer;
-        font-family: 'Outfit', sans-serif;
-        margin-bottom: 16px;
-        overflow: hidden;
-        transition: box-shadow 0.45s cubic-bezier(0.23, 1, 0.32, 1), transform 0.3s ease;
+        position: relative; display: flex; align-items: center; justify-content: center;
+        width: 100%; padding: 20px 24px; border-radius: 16px; background: ${COLORS.primary};
+        border: none; color: #fff; font-size: 17px; font-weight: 700; cursor: pointer;
+        font-family: 'Outfit',sans-serif; margin-bottom: 16px; overflow: hidden;
         box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+        transition: box-shadow 0.45s cubic-bezier(0.23,1,0.32,1), transform 0.3s ease;
       }
-      .cp12-primary-btn:hover { filter: none; }
+      .cp12-primary-btn:hover { filter: none !important; box-shadow: 0 10px 28px ${COLORS.accent}55; transform: translateY(-2px); }
+      .cp12-primary-btn:active { transform: scale(0.98) translateY(0) !important; }
       .cp12-primary-btn .cp12-btn-circle {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 22px;
-        height: 22px;
-        background: ${COLORS.accent};
-        border-radius: 50%;
-        opacity: 0;
-        transition: width 0.7s cubic-bezier(0.23, 1, 0.32, 1), height 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.4s ease;
-        z-index: 0;
-        pointer-events: none;
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+        width: 22px; height: 22px; background: ${COLORS.accent}; border-radius: 50%;
+        opacity: 0; transition: width 0.7s cubic-bezier(0.23,1,0.32,1), height 0.7s cubic-bezier(0.23,1,0.32,1), opacity 0.4s ease;
+        z-index: 0; pointer-events: none;
       }
       .cp12-primary-btn .cp12-btn-content {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        position: relative; z-index: 1; display: flex; align-items: center; gap: 12px;
+        transition: transform 0.5s cubic-bezier(0.23,1,0.32,1);
       }
       .cp12-primary-btn .cp12-btn-arrow {
-        position: absolute;
-        right: 24px;
-        z-index: 1;
-        opacity: 0;
-        transform: translateX(-12px);
-        transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
-        color: #fff;
+        position: absolute; right: 24px; z-index: 1; opacity: 0;
+        transform: translateX(-12px); transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.23,1,0.32,1); color: #fff;
       }
-      .cp12-primary-btn:hover {
-        box-shadow: 0 10px 28px ${COLORS.accent}55;
-        transform: translateY(-2px);
-      }
-      .cp12-primary-btn:hover .cp12-btn-circle {
-        width: 1200px;
-        height: 1200px;
-        opacity: 1;
-      }
-      .cp12-primary-btn:hover .cp12-btn-content {
-        transform: translateX(-14px);
-      }
-      .cp12-primary-btn:hover .cp12-btn-arrow {
-        opacity: 1;
-        transform: translateX(0);
-      }
-      .cp12-primary-btn:active { transform: scale(0.98) !important; }
+      .cp12-primary-btn:hover .cp12-btn-circle { width: 1200px; height: 1200px; opacity: 1; }
+      .cp12-primary-btn:hover .cp12-btn-content { transform: translateX(-14px); }
+      .cp12-primary-btn:hover .cp12-btn-arrow { opacity: 1; transform: translateX(0); }
 
-      /* ─── Subtle hover on secondary dashboard card ─── */
+      /* ─── Secondary dashboard card hover ─── */
       .cp12-secondary-card {
-        transition: transform 0.25s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+        transition: transform 0.3s cubic-bezier(0.23,1,0.32,1), box-shadow 0.3s ease, border-color 0.3s ease !important;
       }
       .cp12-secondary-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 22px rgba(0,0,0,0.08);
-        border-color: ${COLORS.accent}60 !important;
-        filter: none;
+        transform: translateY(-3px) !important; filter: none !important;
+        box-shadow: 0 10px 28px rgba(0,0,0,0.08) !important; border-color: ${COLORS.accent}50 !important;
+      }
+
+      /* ─── Certificate card hover ─── */
+      .cp12-cert-card {
+        transition: transform 0.3s cubic-bezier(0.23,1,0.32,1), box-shadow 0.3s ease, border-color 0.3s ease;
+      }
+      .cp12-cert-card:hover {
+        transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.08) !important;
+        border-color: ${COLORS.accent}40 !important;
+      }
+
+      /* ─── Animated DELETE button — text slides up, X slides in ─── */
+      .cp12-delete-btn {
+        position: relative; overflow: hidden; background: #fff; border: 1.5px solid ${COLORS.border};
+        border-radius: 8px; padding: 0; width: 44px; height: 38px; cursor: pointer;
+        transition: background 0.35s ease, border-color 0.35s ease, width 0.4s cubic-bezier(0.23,1,0.32,1);
+      }
+      .cp12-delete-btn .cp12-del-text, .cp12-delete-btn .cp12-del-icon {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        transition: transform 0.4s cubic-bezier(0.23,1,0.32,1), opacity 0.3s ease;
+        font-size: 12px; font-weight: 700; font-family: 'Outfit',sans-serif;
+      }
+      .cp12-delete-btn .cp12-del-text { color: ${COLORS.red}; transform: translateY(0); opacity: 1; }
+      .cp12-delete-btn .cp12-del-icon { color: #fff; transform: translateY(100%); opacity: 0; }
+      .cp12-delete-btn:hover {
+        background: ${COLORS.red}; border-color: ${COLORS.red}; filter: none !important;
+        box-shadow: 0 4px 14px rgba(198,40,40,0.3);
+      }
+      .cp12-delete-btn:hover .cp12-del-text { transform: translateY(-100%); opacity: 0; }
+      .cp12-delete-btn:hover .cp12-del-icon { transform: translateY(0); opacity: 1; }
+      .cp12-delete-btn:active { transform: scale(0.9) !important; }
+
+      /* ─── Animated DOWNLOAD button (card) — text slides up, icon slides in ─── */
+      .cp12-download-btn {
+        position: relative; overflow: hidden; background: ${COLORS.accent}; border: none;
+        border-radius: 8px; padding: 0; height: 38px; flex: 1; cursor: pointer;
+        transition: background 0.35s ease, box-shadow 0.35s ease;
+      }
+      .cp12-download-btn .cp12-dl-text, .cp12-download-btn .cp12-dl-icon {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6;
+        transition: transform 0.4s cubic-bezier(0.23,1,0.32,1), opacity 0.3s ease;
+        font-size: 13px; font-weight: 700; color: #fff; font-family: 'Outfit',sans-serif;
+      }
+      .cp12-download-btn .cp12-dl-text { transform: translateY(0); opacity: 1; }
+      .cp12-download-btn .cp12-dl-icon { transform: translateY(100%); opacity: 0; }
+      .cp12-download-btn:hover {
+        background: #bf4500; filter: none !important;
+        box-shadow: 0 4px 14px ${COLORS.accent}40;
+      }
+      .cp12-download-btn:hover .cp12-dl-text { transform: translateY(-100%); opacity: 0; }
+      .cp12-download-btn:hover .cp12-dl-icon { transform: translateY(0); opacity: 1; }
+      .cp12-download-btn:active { transform: scale(0.95) !important; }
+
+      /* ─── Full-width Download PDF button (review step) ─── */
+      .cp12-download-btn-full {
+        position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+        width: 100%; padding: 16px 20px; margin-top: 10px; border-radius: 10px;
+        background: ${COLORS.primary}; border: none; color: #fff; font-size: 15px; font-weight: 700;
+        cursor: pointer; font-family: 'Outfit',sans-serif;
+        transition: background 0.35s ease, box-shadow 0.35s ease;
+      }
+      .cp12-download-btn-full .cp12-dlf-text, .cp12-download-btn-full .cp12-dlf-icon {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10;
+        transition: transform 0.45s cubic-bezier(0.23,1,0.32,1), opacity 0.3s ease;
+        font-size: 15px; font-weight: 700; color: #fff; font-family: 'Outfit',sans-serif;
+      }
+      .cp12-download-btn-full .cp12-dlf-text { transform: translateY(0); opacity: 1; }
+      .cp12-download-btn-full .cp12-dlf-icon { transform: translateY(100%); opacity: 0; }
+      .cp12-download-btn-full:hover {
+        background: ${COLORS.accent}; filter: none !important;
+        box-shadow: 0 8px 24px ${COLORS.accent}40;
+      }
+      .cp12-download-btn-full:hover .cp12-dlf-text { transform: translateY(-100%); opacity: 0; }
+      .cp12-download-btn-full:hover .cp12-dlf-icon { transform: translateY(0); opacity: 1; }
+      .cp12-download-btn-full:active { transform: scale(0.98) !important; }
+
+      /* ─── Add Appliance button pulse ─── */
+      .cp12-add-appliance-btn {
+        transition: transform 0.3s cubic-bezier(0.23,1,0.32,1), box-shadow 0.3s ease, border-color 0.3s ease !important;
+      }
+      .cp12-add-appliance-btn:hover {
+        transform: translateY(-2px) !important; filter: none !important;
+        border-color: ${COLORS.accent} !important;
+        box-shadow: 0 6px 20px ${COLORS.accent}25 !important;
+        background: ${COLORS.accentBg} !important;
+      }
+
+      /* ─── Save Certificate button glow ─── */
+      .cp12-save-btn {
+        transition: transform 0.3s cubic-bezier(0.23,1,0.32,1), box-shadow 0.3s ease !important;
+      }
+      .cp12-save-btn:hover {
+        transform: translateY(-2px) !important; filter: none !important;
+        box-shadow: 0 8px 24px ${COLORS.accent}40 !important;
+      }
+
+      /* ─── Overall status badge pulse (when safe) ─── */
+      .cp12-status-pulse { animation: subtlePulse 2.5s ease-in-out infinite; }
+
+      /* ─── Form step indicator ─── */
+      .cp12-step-dot {
+        transition: all 0.35s cubic-bezier(0.23,1,0.32,1) !important;
+      }
+      .cp12-step-dot:hover { transform: scale(1.15); }
+
+      /* ─── Icon buttons (settings, logout, back) ─── */
+      .cp12-icon-btn-wrap {
+        transition: transform 0.25s cubic-bezier(0.23,1,0.32,1), background 0.25s ease !important;
+      }
+      .cp12-icon-btn-wrap:hover {
+        transform: scale(1.1) !important; filter: none !important;
+        background: ${COLORS.accentBg} !important; border-color: ${COLORS.accent}40 !important;
       }
     `}</style>
   );
