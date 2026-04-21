@@ -227,12 +227,9 @@ function AppContent() {
       <div style={appS.root}><GlobalStyles /><div style={appS.bgDots} />
         <div style={appS.container}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <AppLogo size={56} />
-              <div>
-                <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.5 }}>Gas Safety Certificates</h1>
-                
-              </div>
+            <div>
+              <h1 style={{ fontSize: 30, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.8 }}>Welcome</h1>
+              <p style={{ fontSize: 14, color: COLORS.muted, margin: "6px 0 0 0", fontWeight: 500 }}>What would you like to do today?</p>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <button onClick={() => setShowSettings(true)} title="Settings" style={appS.iconBtn}><Settings size={18} /></button>
@@ -240,14 +237,19 @@ function AppContent() {
             </div>
           </div>
 
-          <button onClick={startNew} style={{ ...appS.darkBtn, width: "100%", padding: 20, fontSize: 17, gap: 12, marginBottom: 16, borderRadius: 16 }}>
-            <FilePlus size={24} /> Create New Certificate
+          <button onClick={startNew} className="cp12-primary-btn" type="button">
+            <span className="cp12-btn-circle" aria-hidden="true"></span>
+            <span className="cp12-btn-content">
+              <FilePlus size={24} strokeWidth={2.5} />
+              <span>Create New Certificate</span>
+            </span>
+            <ChevronRight size={22} strokeWidth={3} className="cp12-btn-arrow" aria-hidden="true" />
           </button>
 
-          <button onClick={() => setCurrentView("certificates")} style={{
+          <button onClick={() => setCurrentView("certificates")} className="cp12-secondary-card" style={{
             display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: 20, borderRadius: 16,
             background: COLORS.card, border: `1.5px solid ${COLORS.border}`, cursor: "pointer", fontFamily: "'Outfit', sans-serif",
-            boxShadow: "0 2px 8px rgba(0,0,0,.04)", transition: "all 0.2s",
+            boxShadow: "0 2px 8px rgba(0,0,0,.04)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <div style={{ width: 48, height: 48, borderRadius: 14, background: COLORS.accentBg, display: "flex", alignItems: "center", justifyContent: "center" }}>

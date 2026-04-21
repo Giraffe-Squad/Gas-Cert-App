@@ -260,6 +260,88 @@ export function GlobalStyles() {
       button:active { transform: scale(0.97) !important; }
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-thumb { background: #d0d5db; border-radius: 3px; }
+
+      /* ─── Animated primary CTA button ─── */
+      .cp12-primary-btn {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 20px 24px;
+        border-radius: 16px;
+        background: ${COLORS.primary};
+        border: none;
+        color: #fff;
+        font-size: 17px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+        margin-bottom: 16px;
+        overflow: hidden;
+        transition: box-shadow 0.45s cubic-bezier(0.23, 1, 0.32, 1), transform 0.3s ease;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+      }
+      .cp12-primary-btn:hover { filter: none; }
+      .cp12-primary-btn .cp12-btn-circle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 22px;
+        height: 22px;
+        background: ${COLORS.accent};
+        border-radius: 50%;
+        opacity: 0;
+        transition: width 0.7s cubic-bezier(0.23, 1, 0.32, 1), height 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.4s ease;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .cp12-primary-btn .cp12-btn-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+      }
+      .cp12-primary-btn .cp12-btn-arrow {
+        position: absolute;
+        right: 24px;
+        z-index: 1;
+        opacity: 0;
+        transform: translateX(-12px);
+        transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        color: #fff;
+      }
+      .cp12-primary-btn:hover {
+        box-shadow: 0 10px 28px ${COLORS.accent}55;
+        transform: translateY(-2px);
+      }
+      .cp12-primary-btn:hover .cp12-btn-circle {
+        width: 1200px;
+        height: 1200px;
+        opacity: 1;
+      }
+      .cp12-primary-btn:hover .cp12-btn-content {
+        transform: translateX(-14px);
+      }
+      .cp12-primary-btn:hover .cp12-btn-arrow {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      .cp12-primary-btn:active { transform: scale(0.98) !important; }
+
+      /* ─── Subtle hover on secondary dashboard card ─── */
+      .cp12-secondary-card {
+        transition: transform 0.25s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+      }
+      .cp12-secondary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+        border-color: ${COLORS.accent}60 !important;
+        filter: none;
+      }
     `}</style>
   );
 }
