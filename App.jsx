@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { supabase } from './supabase';
 import {
   User, Building2, Home, Flame, Wrench, AlertTriangle, PenTool, Send,
   ChevronDown, ChevronLeft, ChevronRight, Plus, Check, Trash2, Shield,
   FileText, Download, CheckCircle2, XCircle, ClipboardCheck,
   FolderOpen, FilePlus, Calendar, Search, X, Settings, LogOut, Key,
-  Edit3, MapPin, LayoutGrid, List,
+  Edit3, MapPin, LayoutGrid, List, Loader2,
 } from 'lucide-react';
 
 import {
   COLORS, APPLIANCE_DATA, FORM_STEPS, createEmptyAppliance,
   createEmptyCertificate, loadFromStorage, saveToStorage,
-  DEFAULT_USERNAME, DEFAULT_PASSWORD, MASTER_KEY, APP_VERSION,
+  MASTER_KEY, APP_VERSION,
 } from './data';
 
 import { generateCertificatePDF } from './generatePDF';
@@ -111,8 +112,6 @@ function SettingsPage({ onClose, userName, setUserName }) {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}><Settings size={22} color={COLORS.accent} /><h2 style={{ fontSize: 20, fontWeight: 700, color: COLORS.primary, margin: 0 }}>Settings</h2></div>
           <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", color: COLORS.muted, padding: 4 }}><X size={20} /></button>
         </div>
-
-        {/* ── Your Name ── */}
         <div style={{ marginBottom: 22, padding: "16px 18px", borderRadius: 14, background: COLORS.inputBg, border: `1px solid ${COLORS.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><User size={16} color={COLORS.accent} /><span style={{ fontSize: 13, fontWeight: 700, color: COLORS.primary, textTransform: "uppercase", letterSpacing: 0.8 }}>Your Name</span></div>
           <p style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10 }}>Shown on the dashboard welcome screen.</p>
@@ -153,7 +152,8 @@ function AppContent() {
   const toast = useToast();
 
   // ALL HOOKS BEFORE CONDITIONAL RETURNS
-  const [isLoggedIn, setIsLoggedIn] = useState(() => loadFromStorage("cp12_session", false));
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState("dashboard");
   const [currentStep, setCurrentStep] = useState(1);
@@ -166,24 +166,33 @@ function AppContent() {
   const [certViewMode, setCertViewMode] = useState("card"); // "card" or "list"
   const [userName, setUserName] = useState(() => loadFromStorage("cp12_user_name", ""));
 
+  // Supabase auth listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+      if (session && _event === 'SIGNED_IN') toast("Welcome back!", "success");
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Version migration
   useEffect(() => {
     if (localStorage.getItem("cp12_version") !== APP_VERSION) {
-      const un = localStorage.getItem("cp12_username");
-      const pw = localStorage.getItem("cp12_password");
       const nm = localStorage.getItem("cp12_user_name");
       const keys = [];
-      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith("cp12_") && k !== "cp12_username" && k !== "cp12_password" && k !== "cp12_user_name") keys.push(k); }
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith("cp12_") && k !== "cp12_user_name") keys.push(k); }
       keys.forEach(k => localStorage.removeItem(k));
       localStorage.setItem("cp12_version", APP_VERSION);
-      if (un) localStorage.setItem("cp12_username", un);
-      if (pw) localStorage.setItem("cp12_password", pw);
       if (nm) localStorage.setItem("cp12_user_name", nm);
     }
   }, []);
 
   useEffect(() => { saveToStorage("cp12_certs", certificates); }, [certificates]);
-  useEffect(() => { saveToStorage("cp12_session", isLoggedIn); }, [isLoggedIn]);
   useEffect(() => { saveToStorage("cp12_user_name", userName); }, [userName]);
   useEffect(() => { if (activeCert?.inspDate) { const d = new Date(activeCert.inspDate); d.setFullYear(d.getFullYear() + 1); updateField("nextDate", d.toISOString().slice(0, 10)); } }, [activeCert?.inspDate]);
 
@@ -195,9 +204,17 @@ function AppContent() {
   }, [certificates, searchQuery]);
 
   // Auth
-  const handleLogin = () => { setIsLoggedIn(true); toast("Welcome back!", "success"); };
-  const handleLogout = () => { setIsLoggedIn(false); saveToStorage("cp12_session", false); };
-  if (!isLoggedIn) return <LoginPage onLogin={handleLogin} />;
+  const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
+  if (authLoading) return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg, fontFamily: "'Outfit',sans-serif" }}>
+      <div style={{ textAlign: "center" }}>
+        <Loader2 size={36} color={COLORS.accent} style={{ animation: "spin 1s linear infinite" }} />
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        <p style={{ marginTop: 16, color: COLORS.muted, fontSize: 14 }}>Loading...</p>
+      </div>
+    </div>
+  );
+  if (!session) return <LoginPage />;
 
   // Actions
   const startNew = () => {
