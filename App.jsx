@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, Plus, Check, Trash2, Shield,
   FileText, Download, CheckCircle2, XCircle, ClipboardCheck,
   FolderOpen, FilePlus, Calendar, Search, X, Settings, LogOut, Key,
-  Edit3, MapPin, LayoutGrid, List, Loader2,
+  Edit3, MapPin, LayoutGrid, List, Loader2, RefreshCw, CloudOff, Cloud,
 } from 'lucide-react';
 
 import {
@@ -13,6 +13,11 @@ import {
   createEmptyCertificate, loadFromStorage, saveToStorage,
   MASTER_KEY, APP_VERSION,
 } from './data';
+
+import {
+  fetchCertificates, upsertCertificate, deleteCertificate,
+  migrateLocalCertificates,
+} from './certificateService';
 
 import { generateCertificatePDF } from './generatePDF';
 import LoginPage, { AppLogo } from './LoginPage';
@@ -146,6 +151,28 @@ function SettingsPage({ onClose, userName, setUserName }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   SYNC STATUS BADGE — small cloud indicator
+   ═══════════════════════════════════════════════════════════════ */
+function SyncBadge({ status }) {
+  // status: "synced" | "syncing" | "error"
+  if (status === "synced") return (
+    <span title="Synced to cloud" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: COLORS.green, fontWeight: 600 }}>
+      <Cloud size={13} /> Synced
+    </span>
+  );
+  if (status === "syncing") return (
+    <span title="Saving…" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: COLORS.accent, fontWeight: 600 }}>
+      <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> Saving…
+    </span>
+  );
+  return (
+    <span title="Sync error — changes saved locally" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: COLORS.red, fontWeight: 600 }}>
+      <CloudOff size={13} /> Offline
+    </span>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    MAIN APP
    ═══════════════════════════════════════════════════════════════ */
 function AppContent() {
@@ -159,12 +186,14 @@ function AppContent() {
   const [currentStep, setCurrentStep] = useState(1);
   const [slideDirection, setSlideDirection] = useState(0);
   const [slideKey, setSlideKey] = useState(0);
-  const [certificates, setCertificates] = useState(() => loadFromStorage("cp12_certs", []));
+  const [certificates, setCertificates] = useState([]);
+  const [certsLoading, setCertsLoading] = useState(true);
   const [activeCert, setActiveCert] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [certViewMode, setCertViewMode] = useState("card"); // "card" or "list"
+  const [certViewMode, setCertViewMode] = useState("card");
   const [userName, setUserName] = useState(() => loadFromStorage("cp12_user_name", ""));
+  const [syncStatus, setSyncStatus] = useState("synced"); // "synced" | "syncing" | "error"
 
   // Supabase auth listener
   useEffect(() => {
@@ -180,31 +209,95 @@ function AppContent() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Version migration
+  // ─── Fetch certificates from Supabase when session is available ───
   useEffect(() => {
-    if (localStorage.getItem("cp12_version") !== APP_VERSION) {
-      const nm = localStorage.getItem("cp12_user_name");
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith("cp12_") && k !== "cp12_user_name") keys.push(k); }
-      keys.forEach(k => localStorage.removeItem(k));
-      localStorage.setItem("cp12_version", APP_VERSION);
-      if (nm) localStorage.setItem("cp12_user_name", nm);
+    if (!session) {
+      setCertificates([]);
+      setCertsLoading(false);
+      return;
     }
-  }, []);
 
-  useEffect(() => { saveToStorage("cp12_certs", certificates); }, [certificates]);
+    let cancelled = false;
+
+    async function loadCerts() {
+      setCertsLoading(true);
+      try {
+        // Step 1: Migrate any localStorage certs (one-time)
+        const migrated = await migrateLocalCertificates();
+        if (migrated > 0 && !cancelled) {
+          toast(`Migrated ${migrated} certificate${migrated > 1 ? 's' : ''} to cloud`, "success");
+        }
+
+        // Step 2: Fetch all from Supabase
+        const certs = await fetchCertificates();
+        if (!cancelled) {
+          setCertificates(certs);
+          setSyncStatus("synced");
+        }
+      } catch (err) {
+        console.error("Failed to load certificates:", err);
+        if (!cancelled) {
+          // Fallback: try localStorage
+          const local = loadFromStorage("cp12_certs", []);
+          setCertificates(local);
+          setSyncStatus("error");
+          if (local.length > 0) {
+            toast("Using local data — cloud sync failed", "error");
+          }
+        }
+      } finally {
+        if (!cancelled) setCertsLoading(false);
+      }
+    }
+
+    loadCerts();
+    return () => { cancelled = true; };
+  }, [session]);
+
+  // Keep userName in localStorage (local preference, not cert data)
   useEffect(() => { saveToStorage("cp12_user_name", userName); }, [userName]);
-  useEffect(() => { if (activeCert?.inspDate) { const d = new Date(activeCert.inspDate); d.setFullYear(d.getFullYear() + 1); updateField("nextDate", d.toISOString().slice(0, 10)); } }, [activeCert?.inspDate]);
+
+  // Auto-compute next inspection date
+  useEffect(() => {
+    if (activeCert?.inspDate) {
+      const d = new Date(activeCert.inspDate);
+      d.setFullYear(d.getFullYear() + 1);
+      updateField("nextDate", d.toISOString().slice(0, 10));
+    }
+  }, [activeCert?.inspDate]);
 
   const filteredCerts = useMemo(() => {
     const rev = [...certificates].reverse();
     if (!searchQuery.trim()) return rev;
     const q = searchQuery.toLowerCase();
-    return rev.filter(c => (c.prop?.address || "").toLowerCase().includes(q) || (c.prop?.postcode || "").toLowerCase().includes(q) || (c.ll?.name || "").toLowerCase().includes(q) || (c.ll?.address || "").toLowerCase().includes(q) || (c.eng?.company || "").toLowerCase().includes(q) || (c.eng?.name || "").toLowerCase().includes(q) || (c.certNo || "").toLowerCase().includes(q));
+    return rev.filter(c =>
+      (c.prop?.address || "").toLowerCase().includes(q) ||
+      (c.prop?.postcode || "").toLowerCase().includes(q) ||
+      (c.ll?.name || "").toLowerCase().includes(q) ||
+      (c.ll?.address || "").toLowerCase().includes(q) ||
+      (c.eng?.company || "").toLowerCase().includes(q) ||
+      (c.eng?.name || "").toLowerCase().includes(q) ||
+      (c.certNo || "").toLowerCase().includes(q)
+    );
   }, [certificates, searchQuery]);
+
+  // ─── Refresh certificates from Supabase ───
+  const refreshCerts = useCallback(async () => {
+    if (!session) return;
+    try {
+      setSyncStatus("syncing");
+      const certs = await fetchCertificates();
+      setCertificates(certs);
+      setSyncStatus("synced");
+    } catch (err) {
+      console.error("Refresh failed:", err);
+      setSyncStatus("error");
+    }
+  }, [session]);
 
   // Auth
   const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
+
   if (authLoading) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg, fontFamily: "'Outfit',sans-serif" }}>
       <div style={{ textAlign: "center" }}>
@@ -216,35 +309,93 @@ function AppContent() {
   );
   if (!session) return <LoginPage />;
 
-  // Actions
+  // ─── Actions — all write to Supabase ───
   const startNew = () => {
     const newCert = createEmptyCertificate();
-    // Auto-generate CP12 number
+    // Auto-generate CP12 number from existing certs
     const existingNums = certificates.map(c => {
       const match = (c.certNo || '').match(/CP12-(\d+)/);
       return match ? parseInt(match[1]) : 0;
     });
     const nextNum = (existingNums.length > 0 ? Math.max(...existingNums) : 0) + 1;
     newCert.certNo = 'CP12-' + String(nextNum).padStart(4, '0');
-    setActiveCert(newCert); setCurrentStep(1); setSlideDirection(0); setSlideKey(0); setCurrentView("form"); };
-  const openCert = (cert, editMode = false) => { setActiveCert({ ...cert }); setCurrentStep(editMode ? 1 : 8); setCurrentView("form"); };
-  const saveCert = (status = "draft") => {
+    setActiveCert(newCert);
+    setCurrentStep(1);
+    setSlideDirection(0);
+    setSlideKey(0);
+    setCurrentView("form");
+  };
+
+  const openCert = (cert, editMode = false) => {
+    setActiveCert({ ...cert });
+    setCurrentStep(editMode ? 1 : 8);
+    setCurrentView("form");
+  };
+
+  const saveCert = async (status = "draft") => {
     if (!activeCert) return;
     const updated = { ...activeCert, status, updatedAt: new Date().toISOString() };
-    setCertificates(prev => { const idx = prev.findIndex(c => c.id === updated.id); if (idx >= 0) { const n = [...prev]; n[idx] = updated; return n; } return [...prev, updated]; });
+
+    // Optimistic local update
+    setCertificates(prev => {
+      const idx = prev.findIndex(c => c.id === updated.id);
+      if (idx >= 0) { const n = [...prev]; n[idx] = updated; return n; }
+      return [...prev, updated];
+    });
     setActiveCert(updated);
+
+    // Save engineer/property/landlord to localStorage for "Choose Existing" dropdowns
     if (updated.eng.name) saveExistingEntry("cp12_existing_engineers", updated.eng, "name");
     if (updated.prop.address) saveExistingEntry("cp12_existing_properties", updated.prop, "address");
     if (updated.ll.name) saveExistingEntry("cp12_existing_landlords", updated.ll, "name");
-    toast(status === "complete" ? "Certificate saved!" : "Draft saved", "success");
+
+    // Persist to Supabase
+    setSyncStatus("syncing");
+    try {
+      await upsertCertificate(updated);
+      setSyncStatus("synced");
+      toast(status === "complete" ? "Certificate saved!" : "Draft saved", "success");
+    } catch (err) {
+      console.error("Save to cloud failed:", err);
+      setSyncStatus("error");
+      toast("Saved locally — cloud sync failed", "error");
+    }
   };
-  const confirmDel = () => { if (!deleteTarget) return; setCertificates(prev => prev.filter(c => c.id !== deleteTarget)); setDeleteTarget(null); toast("Deleted", "info"); };
+
+  const confirmDel = async () => {
+    if (!deleteTarget) return;
+
+    // Optimistic local removal
+    setCertificates(prev => prev.filter(c => c.id !== deleteTarget));
+
+    // Delete from Supabase
+    setSyncStatus("syncing");
+    try {
+      await deleteCertificate(deleteTarget);
+      setSyncStatus("synced");
+      toast("Deleted", "info");
+    } catch (err) {
+      console.error("Delete from cloud failed:", err);
+      setSyncStatus("error");
+      toast("Deleted locally — cloud sync failed", "error");
+      // Refresh to get truth from server
+      refreshCerts();
+    }
+    setDeleteTarget(null);
+  };
+
   const dlPDF = (cert) => { try { generateCertificatePDF(cert); } catch (err) { console.error(err); toast("PDF failed", "error"); } };
 
-  // Form
+  // Form helpers
   const updateField = (path, val) => {
     if (!activeCert) return;
-    setActiveCert(prev => { const n = { ...prev }; const p = path.split("."); if (p.length === 2) n[p[0]] = { ...n[p[0]], [p[1]]: val }; else n[p[0]] = val; return n; });
+    setActiveCert(prev => {
+      const n = { ...prev };
+      const p = path.split(".");
+      if (p.length === 2) n[p[0]] = { ...n[p[0]], [p[1]]: val };
+      else n[p[0]] = val;
+      return n;
+    });
   };
   const updateApp = (id, f, v) => setActiveCert(prev => ({ ...prev, apps: prev.apps.map(a => a.id === id ? { ...a, [f]: v } : a) }));
   const removeApp = (id) => { setActiveCert(prev => ({ ...prev, apps: prev.apps.filter(a => a.id !== id) })); toast("Removed", "info"); };
@@ -290,11 +441,23 @@ function AppContent() {
               </div>
               <div style={{ textAlign: "left" }}>
                 <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.primary }}>Completed Certificates</div>
-                <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 2 }}>{certificates.length} certificate{certificates.length !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 2 }}>
+                  {certsLoading ? "Loading…" : `${certificates.length} certificate${certificates.length !== 1 ? "s" : ""}`}
+                </div>
               </div>
             </div>
             <ChevronRight size={22} color={COLORS.muted} />
           </button>
+
+          {/* Sync status */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 16, gap: 10 }}>
+            <SyncBadge status={syncStatus} />
+            {syncStatus === "error" && (
+              <button onClick={refreshCerts} style={{ background: "transparent", border: "none", cursor: "pointer", color: COLORS.accent, fontSize: 11, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                <RefreshCw size={12} /> Retry
+              </button>
+            )}
+          </div>
         </div>
         {showSettings && <SettingsPage onClose={() => setShowSettings(false)} userName={userName} setUserName={setUserName} />}
       </div>
@@ -310,8 +473,16 @@ function AppContent() {
             <button onClick={() => setCurrentView("dashboard")} style={{ ...appS.iconBtn, padding: 8 }}><ChevronLeft size={20} /></button>
             <div style={{ flex: 1 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: COLORS.primary, margin: 0 }}>Completed Certificates</h1>
-              <p style={{ fontSize: 13, color: COLORS.muted, margin: 0 }}>{certificates.length} total</p>
+              <p style={{ fontSize: 13, color: COLORS.muted, margin: 0 }}>
+                {certsLoading ? "Loading…" : `${certificates.length} total`}
+              </p>
             </div>
+            {/* Sync indicator */}
+            <SyncBadge status={syncStatus} />
+            {/* Refresh button */}
+            <button onClick={refreshCerts} title="Refresh from cloud" style={{ ...appS.iconBtn, padding: 6 }}>
+              <RefreshCw size={15} style={syncStatus === "syncing" ? { animation: "spin 1s linear infinite" } : {}} />
+            </button>
             {/* View toggle */}
             <div style={{ display: "flex", border: `1.5px solid ${COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
               <button onClick={() => setCertViewMode("card")} style={{ padding: "6px 10px", border: "none", cursor: "pointer", background: certViewMode === "card" ? COLORS.accent : "#fff", color: certViewMode === "card" ? "#fff" : COLORS.muted, display: "flex" }}><LayoutGrid size={16} /></button>
@@ -325,7 +496,15 @@ function AppContent() {
             {searchQuery && <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: 12, top: 12, background: "transparent", border: "none", cursor: "pointer", color: COLORS.muted }}><X size={16} /></button>}
           </div>
 
-          {filteredCerts.length === 0 && (
+          {/* Loading state */}
+          {certsLoading && (
+            <div style={{ padding: 60, textAlign: "center", color: COLORS.muted, background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
+              <Loader2 size={36} color={COLORS.accent} style={{ animation: "spin 1s linear infinite" }} />
+              <p style={{ marginTop: 16, fontSize: 14 }}>Loading certificates…</p>
+            </div>
+          )}
+
+          {!certsLoading && filteredCerts.length === 0 && (
             <div style={{ padding: 60, textAlign: "center", color: COLORS.muted, background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
               <FileText size={48} color={COLORS.border} />
               <p style={{ marginTop: 16, fontSize: 16 }}>{searchQuery ? "No matches." : "No certificates yet."}</p>
@@ -333,7 +512,7 @@ function AppContent() {
           )}
 
           {/* LIST VIEW */}
-          {certViewMode === "list" && filteredCerts.length > 0 && (
+          {!certsLoading && certViewMode === "list" && filteredCerts.length > 0 && (
             <div style={{ background: COLORS.card, borderRadius: 14, border: `1px solid ${COLORS.border}`, overflow: "auto" }}>
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 0.9fr 0.8fr 60px 60px 100px", gap: 0, padding: "10px 16px", background: COLORS.primary, color: "#fff", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, minWidth: 700 }}>
                 <span>Address</span><span>Landlord / Agent</span><span>Date</span><span>Cert #</span><span style={{ textAlign: "center" }}>Status</span><span style={{ textAlign: "center" }}>Safety</span><span>Actions</span>
@@ -361,7 +540,7 @@ function AppContent() {
           )}
 
           {/* CARD VIEW */}
-          {certViewMode === "card" && filteredCerts.map(item => {
+          {!certsLoading && certViewMode === "card" && filteredCerts.map(item => {
             const contactName = item.ll?.company || item.ll?.name || "—";
             const contactType = (item.ct || "landlord").charAt(0).toUpperCase() + (item.ct || "landlord").slice(1);
             return (
@@ -556,7 +735,10 @@ function AppContent() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => { saveCert(activeCert?.status || "draft"); setCurrentView("dashboard"); }}>
             <AppLogo size={44} /><div><h1 style={{ fontSize: 18, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.5 }}>Gas Safety Certificates</h1><p style={{ fontSize: 11, color: COLORS.muted, margin: 0 }}>CP12 Certificate</p></div>
           </div>
-          <button onClick={() => { saveCert(activeCert?.status || "draft"); setCurrentView("dashboard"); }} style={{ ...appS.outBtn, padding: "7px 14px", fontSize: 12 }}><FolderOpen size={14} /> Dashboard</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <SyncBadge status={syncStatus} />
+            <button onClick={() => { saveCert(activeCert?.status || "draft"); setCurrentView("dashboard"); }} style={{ ...appS.outBtn, padding: "7px 14px", fontSize: 12 }}><FolderOpen size={14} /> Dashboard</button>
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 22, padding: "6px 2px 0", overflow: "visible" }}>
           {FORM_STEPS.map((step, i) => {
