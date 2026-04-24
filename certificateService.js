@@ -6,18 +6,14 @@ import { supabase } from './supabase';
    Table schema (certificates):
      id          TEXT PRIMARY KEY
      user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE
-     data        JSONB NOT NULL          -- full certificate object
+     data        JSONB NOT NULL
      status      TEXT DEFAULT 'draft'
      created_at  TIMESTAMPTZ DEFAULT NOW()
      updated_at  TIMESTAMPTZ DEFAULT NOW()
-   
-   RLS: users can only access their own rows.
    ═══════════════════════════════════════════════════════════════ */
 
 /**
  * Fetch all certificates for the current user.
- * Returns an array of certificate objects (the `data` JSONB column,
- * with `id` and `status` kept in sync from the row-level columns).
  */
 export async function fetchCertificates() {
   const { data: { user } } = await supabase.auth.getUser();
@@ -29,19 +25,20 @@ export async function fetchCertificates() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error('[CertService] fetchCertificates error:', error);
+    throw error;
+  }
 
-  // Unwrap: each row's `data` JSONB is the certificate object
   return (data || []).map(row => ({
     ...row.data,
-    id: row.id,               // ensure id consistency
-    status: row.status,        // ensure status consistency
+    id: row.id,
+    status: row.status,
   }));
 }
 
 /**
  * Upsert (insert or update) a single certificate.
- * Accepts the full certificate object from app state.
  */
 export async function upsertCertificate(cert) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -59,7 +56,10 @@ export async function upsertCertificate(cert) {
     .from('certificates')
     .upsert(row, { onConflict: 'id' });
 
-  if (error) throw error;
+  if (error) {
+    console.error('[CertService] upsertCertificate error:', error);
+    throw error;
+  }
 }
 
 /**
@@ -73,22 +73,23 @@ export async function deleteCertificate(certId) {
     .from('certificates')
     .delete()
     .eq('id', String(certId))
-    .eq('user_id', user.id);     // extra safety
+    .eq('user_id', user.id);
 
-  if (error) throw error;
+  if (error) {
+    console.error('[CertService] deleteCertificate error:', error);
+    throw error;
+  }
 }
 
 /**
  * Migrate any certificates sitting in localStorage to Supabase.
- * Called once after the first successful auth.  Skips certs
- * that already exist in Supabase (by id).
+ * Called once after the first successful fetch proves the table works.
  * Returns the number of certs migrated.
  */
 export async function migrateLocalCertificates() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return 0;
 
-  // Check if migration already done for this user
   const migrationKey = `cp12_migrated_${user.id}`;
   if (localStorage.getItem(migrationKey) === 'true') return 0;
 
@@ -105,11 +106,15 @@ export async function migrateLocalCertificates() {
     return 0;
   }
 
-  // Fetch existing IDs in Supabase so we don't duplicate
-  const { data: existing } = await supabase
+  const { data: existing, error: fetchErr } = await supabase
     .from('certificates')
     .select('id')
     .eq('user_id', user.id);
+
+  if (fetchErr) {
+    console.error('[CertService] migration fetch error:', fetchErr);
+    throw fetchErr;
+  }
 
   const existingIds = new Set((existing || []).map(r => String(r.id)));
 
@@ -129,14 +134,26 @@ export async function migrateLocalCertificates() {
       .from('certificates')
       .insert(toInsert);
 
-    if (error) throw error;
+    if (error) {
+      console.error('[CertService] migration insert error:', error);
+      throw error;
+    }
   }
 
-  // Mark migration done — don't re-import on future logins
   localStorage.setItem(migrationKey, 'true');
-
-  // Clean up localStorage certificates (keep other cp12_ keys intact)
   localStorage.removeItem('cp12_certs');
 
   return toInsert.length;
+}
+
+/**
+ * Reset the migration flag so it re-runs next login.
+ */
+export function resetMigrationFlag() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('cp12_migrated_')) keys.push(k);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
 }

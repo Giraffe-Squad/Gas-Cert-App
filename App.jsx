@@ -16,7 +16,7 @@ import {
 
 import {
   fetchCertificates, upsertCertificate, deleteCertificate,
-  migrateLocalCertificates,
+  migrateLocalCertificates, resetMigrationFlag,
 } from './certificateService';
 
 import { generateCertificatePDF } from './generatePDF';
@@ -30,7 +30,7 @@ import {
 const STEP_ICONS = { 1: User, 2: Home, 3: Building2, 4: Flame, 5: Wrench, 6: AlertTriangle, 7: PenTool, 8: Send };
 
 /* ═══════════════════════════════════════════════════════════════
-   APPLIANCE CARD — Serial No and GC Number removed
+   APPLIANCE CARD
    ═══════════════════════════════════════════════════════════════ */
 function ApplianceCard({ appliance, index, onUpdate, onRemove, canRemove }) {
   const [isExpanded, setIsExpanded] = useState(index === 0);
@@ -151,10 +151,9 @@ function SettingsPage({ onClose, userName, setUserName }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SYNC STATUS BADGE — small cloud indicator
+   SYNC STATUS BADGE
    ═══════════════════════════════════════════════════════════════ */
 function SyncBadge({ status }) {
-  // status: "synced" | "syncing" | "error"
   if (status === "synced") return (
     <span title="Synced to cloud" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: COLORS.green, fontWeight: 600 }}>
       <Cloud size={13} /> Synced
@@ -178,7 +177,6 @@ function SyncBadge({ status }) {
 function AppContent() {
   const toast = useToast();
 
-  // ALL HOOKS BEFORE CONDITIONAL RETURNS
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -193,7 +191,7 @@ function AppContent() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [certViewMode, setCertViewMode] = useState("card");
   const [userName, setUserName] = useState(() => loadFromStorage("cp12_user_name", ""));
-  const [syncStatus, setSyncStatus] = useState("synced"); // "synced" | "syncing" | "error"
+  const [syncStatus, setSyncStatus] = useState("synced");
 
   // Supabase auth listener
   useEffect(() => {
@@ -221,29 +219,48 @@ function AppContent() {
 
     async function loadCerts() {
       setCertsLoading(true);
+
+      // Always start with localStorage so user sees their data instantly
+      const localCerts = loadFromStorage("cp12_certs", []);
+      if (localCerts.length > 0 && !cancelled) {
+        setCertificates(localCerts);
+      }
+
       try {
-        // Step 1: Migrate any localStorage certs (one-time)
+        // Try to migrate localStorage → Supabase (one-time)
         const migrated = await migrateLocalCertificates();
         if (migrated > 0 && !cancelled) {
           toast(`Migrated ${migrated} certificate${migrated > 1 ? 's' : ''} to cloud`, "success");
         }
 
-        // Step 2: Fetch all from Supabase
-        const certs = await fetchCertificates();
+        // Fetch all from Supabase
+        const cloudCerts = await fetchCertificates();
         if (!cancelled) {
-          setCertificates(certs);
-          setSyncStatus("synced");
+          if (cloudCerts.length > 0) {
+            // Cloud has data — use it as source of truth
+            setCertificates(cloudCerts);
+            setSyncStatus("synced");
+          } else if (localCerts.length > 0) {
+            // Cloud is empty but local has data — keep local, mark as needing sync
+            setCertificates(localCerts);
+            setSyncStatus("error");
+            // Reset migration flag so it re-tries pushing local → cloud
+            resetMigrationFlag();
+          } else {
+            // Both empty — fresh start
+            setCertificates([]);
+            setSyncStatus("synced");
+          }
         }
       } catch (err) {
         console.error("Failed to load certificates:", err);
         if (!cancelled) {
-          // Fallback: try localStorage
-          const local = loadFromStorage("cp12_certs", []);
-          setCertificates(local);
-          setSyncStatus("error");
-          if (local.length > 0) {
-            toast("Using local data — cloud sync failed", "error");
+          // Keep whatever we loaded from localStorage
+          if (localCerts.length > 0) {
+            setCertificates(localCerts);
           }
+          setSyncStatus("error");
+          toast("Using local data — cloud sync failed", "error");
         }
       } finally {
         if (!cancelled) setCertsLoading(false);
@@ -254,10 +271,15 @@ function AppContent() {
     return () => { cancelled = true; };
   }, [session]);
 
-  // Keep userName in localStorage (local preference, not cert data)
+  // Keep local backup of certificates (safety net)
+  useEffect(() => {
+    if (certificates.length > 0) {
+      saveToStorage("cp12_certs", certificates);
+    }
+  }, [certificates]);
+
   useEffect(() => { saveToStorage("cp12_user_name", userName); }, [userName]);
 
-  // Auto-compute next inspection date
   useEffect(() => {
     if (activeCert?.inspDate) {
       const d = new Date(activeCert.inspDate);
@@ -281,19 +303,46 @@ function AppContent() {
     );
   }, [certificates, searchQuery]);
 
-  // ─── Refresh certificates from Supabase ───
+  // ─── Refresh — NEVER wipes local data ───
   const refreshCerts = useCallback(async () => {
     if (!session) return;
     try {
       setSyncStatus("syncing");
-      const certs = await fetchCertificates();
-      setCertificates(certs);
-      setSyncStatus("synced");
+      const cloudCerts = await fetchCertificates();
+
+      if (cloudCerts.length > 0) {
+        // Cloud has data — use it
+        setCertificates(cloudCerts);
+        setSyncStatus("synced");
+        toast("Synced from cloud", "success");
+      } else if (certificates.length > 0) {
+        // Cloud empty but we have local data — try pushing local up
+        setSyncStatus("syncing");
+        let pushed = 0;
+        for (const cert of certificates) {
+          try {
+            await upsertCertificate(cert);
+            pushed++;
+          } catch (e) {
+            console.error("Failed to push cert:", cert.id, e);
+          }
+        }
+        if (pushed > 0) {
+          setSyncStatus("synced");
+          toast(`Pushed ${pushed} certificate${pushed > 1 ? 's' : ''} to cloud`, "success");
+        } else {
+          setSyncStatus("error");
+          toast("Could not sync to cloud", "error");
+        }
+      } else {
+        setSyncStatus("synced");
+      }
     } catch (err) {
       console.error("Refresh failed:", err);
       setSyncStatus("error");
+      toast("Sync failed — your data is safe locally", "error");
     }
-  }, [session]);
+  }, [session, certificates]);
 
   // Auth
   const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
@@ -309,10 +358,9 @@ function AppContent() {
   );
   if (!session) return <LoginPage />;
 
-  // ─── Actions — all write to Supabase ───
+  // ─── Actions ───
   const startNew = () => {
     const newCert = createEmptyCertificate();
-    // Auto-generate CP12 number from existing certs
     const existingNums = certificates.map(c => {
       const match = (c.certNo || '').match(/CP12-(\d+)/);
       return match ? parseInt(match[1]) : 0;
@@ -344,7 +392,7 @@ function AppContent() {
     });
     setActiveCert(updated);
 
-    // Save engineer/property/landlord to localStorage for "Choose Existing" dropdowns
+    // Save to localStorage autocomplete
     if (updated.eng.name) saveExistingEntry("cp12_existing_engineers", updated.eng, "name");
     if (updated.prop.address) saveExistingEntry("cp12_existing_properties", updated.prop, "address");
     if (updated.ll.name) saveExistingEntry("cp12_existing_landlords", updated.ll, "name");
@@ -358,30 +406,30 @@ function AppContent() {
     } catch (err) {
       console.error("Save to cloud failed:", err);
       setSyncStatus("error");
-      toast("Saved locally — cloud sync failed", "error");
+      // Data is safe in local state + localStorage backup
+      toast(status === "complete" ? "Certificate saved locally" : "Draft saved locally", "info");
     }
   };
 
   const confirmDel = async () => {
     if (!deleteTarget) return;
+    const targetId = deleteTarget;
+    setDeleteTarget(null);
 
     // Optimistic local removal
-    setCertificates(prev => prev.filter(c => c.id !== deleteTarget));
+    setCertificates(prev => prev.filter(c => c.id !== targetId));
 
     // Delete from Supabase
     setSyncStatus("syncing");
     try {
-      await deleteCertificate(deleteTarget);
+      await deleteCertificate(targetId);
       setSyncStatus("synced");
       toast("Deleted", "info");
     } catch (err) {
       console.error("Delete from cloud failed:", err);
       setSyncStatus("error");
-      toast("Deleted locally — cloud sync failed", "error");
-      // Refresh to get truth from server
-      refreshCerts();
+      toast("Deleted locally", "info");
     }
-    setDeleteTarget(null);
   };
 
   const dlPDF = (cert) => { try { generateCertificatePDF(cert); } catch (err) { console.error(err); toast("PDF failed", "error"); } };
@@ -464,7 +512,7 @@ function AppContent() {
     );
   }
 
-  /* ═════ CERTIFICATES VIEW — card + list toggle ═════ */
+  /* ═════ CERTIFICATES VIEW ═════ */
   if (currentView === "certificates") {
     return (
       <div style={appS.root}><GlobalStyles /><div style={appS.bgDots} />
@@ -477,13 +525,10 @@ function AppContent() {
                 {certsLoading ? "Loading…" : `${certificates.length} total`}
               </p>
             </div>
-            {/* Sync indicator */}
             <SyncBadge status={syncStatus} />
-            {/* Refresh button */}
             <button onClick={refreshCerts} title="Refresh from cloud" style={{ ...appS.iconBtn, padding: 6 }}>
               <RefreshCw size={15} style={syncStatus === "syncing" ? { animation: "spin 1s linear infinite" } : {}} />
             </button>
-            {/* View toggle */}
             <div style={{ display: "flex", border: `1.5px solid ${COLORS.border}`, borderRadius: 8, overflow: "hidden" }}>
               <button onClick={() => setCertViewMode("card")} style={{ padding: "6px 10px", border: "none", cursor: "pointer", background: certViewMode === "card" ? COLORS.accent : "#fff", color: certViewMode === "card" ? "#fff" : COLORS.muted, display: "flex" }}><LayoutGrid size={16} /></button>
               <button onClick={() => setCertViewMode("list")} style={{ padding: "6px 10px", border: "none", cursor: "pointer", background: certViewMode === "list" ? COLORS.accent : "#fff", color: certViewMode === "list" ? "#fff" : COLORS.muted, display: "flex", borderLeft: `1px solid ${COLORS.border}` }}><List size={16} /></button>
@@ -496,7 +541,6 @@ function AppContent() {
             {searchQuery && <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: 12, top: 12, background: "transparent", border: "none", cursor: "pointer", color: COLORS.muted }}><X size={16} /></button>}
           </div>
 
-          {/* Loading state */}
           {certsLoading && (
             <div style={{ padding: 60, textAlign: "center", color: COLORS.muted, background: COLORS.card, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
               <Loader2 size={36} color={COLORS.accent} style={{ animation: "spin 1s linear infinite" }} />
@@ -597,7 +641,7 @@ function AppContent() {
     );
   }
 
-  /* ═════ FORM — UPRN, Serial No, GC Number removed from all steps ═════ */
+  /* ═════ FORM ═════ */
   const renderStep = () => {
     switch (currentStep) {
       case 1: return (<div>
