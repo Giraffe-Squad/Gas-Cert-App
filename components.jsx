@@ -313,7 +313,7 @@ export function GlobalStyles() {
       .cp12-delete-btn {
         position: relative; overflow: hidden; background: #fff; border: 1.5px solid ${COLORS.border};
         border-radius: 8px; padding: 0; width: 44px; height: 38px; cursor: pointer;
-        transition: background 0.35s ease, border-color 0.35s ease, width 0.4s cubic-bezier(0.23,1,0.32,1);
+        transition: background 0.35s ease, border-color 0.35s ease;
       }
       .cp12-delete-btn .cp12-del-text, .cp12-delete-btn .cp12-del-icon {
         position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -374,7 +374,7 @@ export function GlobalStyles() {
       .cp12-download-btn-full:hover .cp12-dlf-icon { transform: translateY(0); opacity: 1; }
       .cp12-download-btn-full:active { transform: scale(0.98) !important; }
 
-      /* ─── Add Appliance button pulse ─── */
+      /* ─── Add Appliance button ─── */
       .cp12-add-appliance-btn {
         transition: transform 0.3s cubic-bezier(0.23,1,0.32,1), box-shadow 0.3s ease, border-color 0.3s ease !important;
       }
@@ -396,21 +396,6 @@ export function GlobalStyles() {
 
       /* ─── Overall status badge pulse (when safe) ─── */
       .cp12-status-pulse { animation: subtlePulse 2.5s ease-in-out infinite; }
-
-      /* ─── Form step indicator ─── */
-      .cp12-step-dot {
-        transition: all 0.35s cubic-bezier(0.23,1,0.32,1) !important;
-      }
-      .cp12-step-dot:hover { transform: scale(1.15); }
-
-      /* ─── Icon buttons (settings, logout, back) ─── */
-      .cp12-icon-btn-wrap {
-        transition: transform 0.25s cubic-bezier(0.23,1,0.32,1), background 0.25s ease !important;
-      }
-      .cp12-icon-btn-wrap:hover {
-        transform: scale(1.1) !important; filter: none !important;
-        background: ${COLORS.accentBg} !important; border-color: ${COLORS.accent}40 !important;
-      }
     `}</style>
   );
 }
