@@ -16,7 +16,7 @@ import {
 
 import {
   fetchCertificates, upsertCertificate, deleteCertificate,
-  migrateLocalCertificates, resetMigrationFlag,
+  migrateLocalCertificates,
 } from './certificateService';
 
 import { generateCertificatePDF } from './generatePDF';
@@ -192,6 +192,7 @@ function AppContent() {
   const [certViewMode, setCertViewMode] = useState("card");
   const [userName, setUserName] = useState(() => loadFromStorage("cp12_user_name", ""));
   const [syncStatus, setSyncStatus] = useState("synced");
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   // Supabase auth listener
   useEffect(() => {
@@ -241,11 +242,15 @@ function AppContent() {
             setCertificates(cloudCerts);
             setSyncStatus("synced");
           } else if (localCerts.length > 0) {
-            // Cloud is empty but local has data — keep local, mark as needing sync
+            // Cloud is empty but local has data — try pushing it up
+            setSyncStatus("syncing");
+            let pushed = 0;
+            for (const c of localCerts) {
+              try { await upsertCertificate(c); pushed++; } catch (e) { console.error("Push failed:", c.id, e); }
+            }
             setCertificates(localCerts);
-            setSyncStatus("error");
-            // Reset migration flag so it re-tries pushing local → cloud
-            resetMigrationFlag();
+            setSyncStatus(pushed > 0 ? "synced" : "error");
+            if (pushed > 0) toast(`Synced ${pushed} certificate${pushed > 1 ? 's' : ''} to cloud`, "success");
           } else {
             // Both empty — fresh start
             setCertificates([]);
@@ -263,7 +268,7 @@ function AppContent() {
           toast("Using local data — cloud sync failed", "error");
         }
       } finally {
-        if (!cancelled) setCertsLoading(false);
+        if (!cancelled) { setCertsLoading(false); setInitialLoadDone(true); }
       }
     }
 
@@ -272,11 +277,12 @@ function AppContent() {
   }, [session]);
 
   // Keep local backup of certificates (safety net)
+  // Only save after initial load is done to avoid wiping localStorage during startup
   useEffect(() => {
-    if (certificates.length > 0) {
+    if (initialLoadDone) {
       saveToStorage("cp12_certs", certificates);
     }
-  }, [certificates]);
+  }, [certificates, initialLoadDone]);
 
   useEffect(() => { saveToStorage("cp12_user_name", userName); }, [userName]);
 
@@ -417,7 +423,11 @@ function AppContent() {
     setDeleteTarget(null);
 
     // Optimistic local removal
-    setCertificates(prev => prev.filter(c => c.id !== targetId));
+    const remaining = certificates.filter(c => c.id !== targetId);
+    setCertificates(remaining);
+
+    // Immediately clear localStorage so ghost certs can't come back
+    saveToStorage("cp12_certs", remaining);
 
     // Delete from Supabase
     setSyncStatus("syncing");
