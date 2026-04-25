@@ -129,6 +129,58 @@ export function createEmptyCertificate() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   INVOICE FACTORY FUNCTIONS
+   ═══════════════════════════════════════════════════════════════ */
+export const INVOICE_STEPS = [
+  { id: 1, label: "Business" },
+  { id: 2, label: "Customer" },
+  { id: 3, label: "Items" },
+  { id: 4, label: "Review" },
+];
+
+export function createEmptyLineItem() {
+  return {
+    id: Date.now() + Math.random(),
+    description: "",
+    quantity: 1,
+    rate: 0,
+  };
+}
+
+export function createEmptyInvoice() {
+  return {
+    id: Date.now(),
+    invoiceNo: "",
+    invoiceDate: new Date().toISOString().slice(0, 10),
+    dueDate: "",
+    business: {
+      name: "", address: "", city: "", postcode: "",
+      phone: "", email: "", gasSafe: "",
+    },
+    customer: {
+      name: "", company: "", address: "", city: "",
+      postcode: "", email: "", phone: "",
+    },
+    items: [createEmptyLineItem()],
+    vatRate: 0,
+    notes: "",
+    paymentDetails: "",
+    status: "draft",
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function calcInvoiceTotals(invoice) {
+  const subtotal = (invoice.items || []).reduce(
+    (sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0),
+    0
+  );
+  const vatAmount = subtotal * ((parseFloat(invoice.vatRate) || 0) / 100);
+  const total = subtotal + vatAmount;
+  return { subtotal, vatAmount, total };
+}
+
+/* ═══════════════════════════════════════════════════════════════
    LOCAL STORAGE HELPERS
    ═══════════════════════════════════════════════════════════════ */
 export function loadFromStorage(key, fallback) {
@@ -154,4 +206,4 @@ export function saveToStorage(key, value) {
 export const DEFAULT_USERNAME = "mediumlinkuk";
 export const DEFAULT_PASSWORD = "Wajfeb909090@";
 export const MASTER_KEY = "0526";
-export const APP_VERSION = "3.0";
+export const APP_VERSION = "3.1";

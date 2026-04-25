@@ -6,6 +6,7 @@ import {
   FileText, Download, CheckCircle2, XCircle, ClipboardCheck,
   FolderOpen, FilePlus, Calendar, Search, X, Settings, LogOut, Key,
   Edit3, MapPin, LayoutGrid, List, Loader2, RefreshCw, CloudOff, Cloud,
+  Mail, Receipt,
 } from 'lucide-react';
 
 import {
@@ -20,7 +21,9 @@ import {
 } from './certificateService';
 
 import { generateCertificatePDF } from './generatePDF';
+import { emailCertificate } from './emailService';
 import LoginPage, { AppLogo } from './LoginPage';
+import InvoiceApp from './InvoiceApp';
 import {
   ToastProvider, useToast, ConfirmDialog, ComboBox, TriStateButtons,
   FormField, SectionHeader, StepTitle, ChooseExisting, saveExistingEntry,
@@ -193,6 +196,7 @@ function AppContent() {
   const [userName, setUserName] = useState(() => loadFromStorage("cp12_user_name", ""));
   const [syncStatus, setSyncStatus] = useState("synced");
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
 
   // Supabase auth listener
   useEffect(() => {
@@ -444,6 +448,24 @@ function AppContent() {
 
   const dlPDF = (cert) => { try { generateCertificatePDF(cert); } catch (err) { console.error(err); toast("PDF failed", "error"); } };
 
+  // ─── Email certificate PDF ───
+  const sendCertEmail = async (cert) => {
+    const emails = [cert.ll?.email, cert.eng?.email].filter(Boolean);
+    if (emails.length === 0) { toast("No email addresses on this certificate", "error"); return; }
+    setEmailSending(true);
+    try {
+      const pdfDoc = generateCertificatePDF(cert, false);
+      const result = await emailCertificate(cert, pdfDoc);
+      if (result.success) toast(result.message, "success");
+      else toast(result.message, "error");
+    } catch (err) {
+      console.error(err);
+      toast("Email failed — check console", "error");
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   // Form helpers
   const updateField = (path, val) => {
     if (!activeCert) return;
@@ -462,6 +484,16 @@ function AppContent() {
 
   const cert = activeCert || createEmptyCertificate();
   const isOverallSafe = cert.apps.length > 0 && cert.apps.every(a => a.appSafeToUse === "Yes");
+
+  /* ═════ INVOICES VIEW ═════ */
+  if (currentView === "invoices") {
+    return (
+      <>
+        <GlobalStyles />
+        <InvoiceApp onBack={() => setCurrentView("dashboard")} session={session} />
+      </>
+    );
+  }
 
   /* ═════ DASHBOARD ═════ */
   if (currentView === "dashboard") {
@@ -502,6 +534,24 @@ function AppContent() {
                 <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 2 }}>
                   {certsLoading ? "Loading…" : `${certificates.length} certificate${certificates.length !== 1 ? "s" : ""}`}
                 </div>
+              </div>
+            </div>
+            <ChevronRight size={22} color={COLORS.muted} />
+          </button>
+
+          {/* ─── Invoice Button (NEW) ─── */}
+          <button onClick={() => setCurrentView("invoices")} className="cp12-secondary-card" style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: 20, borderRadius: 16,
+            background: COLORS.card, border: `1.5px solid ${COLORS.border}`, cursor: "pointer", fontFamily: "'Outfit', sans-serif",
+            boxShadow: "0 2px 8px rgba(0,0,0,.04)", marginTop: 12,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: COLORS.accentBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Receipt size={24} color={COLORS.accent} />
+              </div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.primary }}>Invoices</div>
+                <div style={{ fontSize: 13, color: COLORS.muted, marginTop: 2 }}>Plumbing & gas invoices</div>
               </div>
             </div>
             <ChevronRight size={22} color={COLORS.muted} />
@@ -745,7 +795,7 @@ function AppContent() {
         {cert.decl.engSig && <div style={{ marginTop: 16, padding: "12px 20px", borderRadius: 12, background: "#fafafa", border: `1.5px solid ${COLORS.border}`, textAlign: "center" }}><span style={{ fontSize: 11, color: COLORS.muted }}>Signature</span><div style={{ fontFamily: "cursive", fontSize: 28, color: COLORS.primary, marginTop: 6, fontStyle: "italic" }}>{cert.decl.engSig}</div></div>}
       </div>);
       case 8: return (<div>
-        <StepTitle icon={Send} title="Review & Download" description="Review, save, and download." />
+        <StepTitle icon={Send} title="Review & Download" description="Review, save, download, or email." />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 12 }}>
           {[{ t: "Engineer", i: User, r: [["Name", cert.eng.name], ["Gas Safe", cert.eng.gasSafe], ["Company", cert.eng.company]] },
             { t: "Property", i: Home, r: [["Address", [cert.prop.address, cert.prop.city, cert.prop.postcode].filter(Boolean).join(", ")], ["Inspected", cert.inspDate], ["Next Due", cert.nextDate]] },
@@ -776,6 +826,22 @@ function AppContent() {
           <span className="cp12-dlf-text"><Download size={18} /> Download PDF</span>
           <span className="cp12-dlf-icon"><Download size={22} strokeWidth={2.5} /></span>
         </button>
+
+        {/* ─── EMAIL PDF BUTTON (NEW) ─── */}
+        {(() => {
+          const emails = [cert.ll?.email, cert.eng?.email].filter(Boolean);
+          const hasEmails = emails.length > 0;
+          return (
+            <button onClick={() => sendCertEmail(cert)} disabled={emailSending || !hasEmails} style={{
+              ...appS.darkBtn, width: "100%", marginTop: 10, opacity: (!hasEmails || emailSending) ? 0.5 : 1,
+              background: COLORS.green,
+            }}>
+              {emailSending ? <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> : <Mail size={18} />}
+              {emailSending ? "Sending…" : hasEmails ? `Email PDF to ${emails.join(" & ")}` : "No email addresses on certificate"}
+            </button>
+          );
+        })()}
+
         <button onClick={() => { saveCert(cert.status === "complete" ? "complete" : "draft"); setCurrentView("dashboard"); }} style={{ ...appS.outBtn, width: "100%", marginTop: 10, justifyContent: "center", padding: 14 }}><ChevronLeft size={17} /> Back to Dashboard</button>
       </div>);
       default: return null;
