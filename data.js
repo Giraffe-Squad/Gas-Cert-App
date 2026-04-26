@@ -130,6 +130,7 @@ export function createEmptyCertificate() {
 
 /* ═══════════════════════════════════════════════════════════════
    INVOICE FACTORY FUNCTIONS
+   (No Gas Safe — invoices are general plumbing/gas invoices)
    ═══════════════════════════════════════════════════════════════ */
 export const INVOICE_STEPS = [
   { id: 1, label: "Business" },
@@ -155,7 +156,7 @@ export function createEmptyInvoice() {
     dueDate: "",
     business: {
       name: "", address: "", city: "", postcode: "",
-      phone: "", email: "", gasSafe: "",
+      phone: "", email: "",
     },
     customer: {
       name: "", company: "", address: "", city: "",

@@ -253,6 +253,8 @@ export default function InvoiceApp({ onBack, session }) {
     const remaining = invoices.filter(i => i.id !== targetId);
     setInvoices(remaining);
     saveToStorage("cp12_invoices", remaining);
+    // NOTE: Deleting invoices does NOT delete saved business/customer entries
+    // Those are stored separately and persist for future use
     setSyncStatus("syncing");
     try { await deleteInvoice(targetId); setSyncStatus("synced"); toast("Deleted", "info"); } catch { setSyncStatus("error"); toast("Deleted locally", "info"); }
   };
@@ -435,13 +437,12 @@ export default function InvoiceApp({ onBack, session }) {
         <StepTitle icon={User} title="Your Business Details" description="Your company information for the invoice header." />
         <ChooseExisting storageKey="cp12_existing_businesses" labelField="name" secondaryField="phone" onSelect={(entry) => { setActiveInvoice(prev => ({ ...prev, business: { ...entry } })); toast("Loaded", "success"); }} />
         <div style={s.grid}>
-          <FormField label="Business Name" required half><input style={componentStyles.input} value={inv.business.name} onChange={e => updateField("business.name", e.target.value)} placeholder="e.g. SafeGas Solutions Ltd" /></FormField>
-          <FormField label="Gas Safe Reg. No." half><input style={componentStyles.input} value={inv.business.gasSafe} onChange={e => updateField("business.gasSafe", e.target.value)} placeholder="123456" /></FormField>
+          <FormField label="Business Name" required half><input style={componentStyles.input} value={inv.business.name} onChange={e => updateField("business.name", e.target.value)} placeholder="e.g. Mediumlink UK Ltd" /></FormField>
+          <FormField label="Phone" half><input style={componentStyles.input} type="tel" value={inv.business.phone} onChange={e => updateField("business.phone", e.target.value)} placeholder="07700 900123" /></FormField>
           <FormField label="Address"><input style={componentStyles.input} value={inv.business.address} onChange={e => updateField("business.address", e.target.value)} placeholder="Full business address" /></FormField>
           <FormField label="City" half><input style={componentStyles.input} value={inv.business.city} onChange={e => updateField("business.city", e.target.value)} placeholder="London" /></FormField>
           <FormField label="Postcode" half><input style={{ ...componentStyles.input, textTransform: "uppercase" }} value={inv.business.postcode} onChange={e => updateField("business.postcode", e.target.value.toUpperCase())} placeholder="SW1A 1AA" /></FormField>
-          <FormField label="Phone" half><input style={componentStyles.input} type="tel" value={inv.business.phone} onChange={e => updateField("business.phone", e.target.value)} placeholder="07700 900123" /></FormField>
-          <FormField label="Email" half><input style={componentStyles.input} type="email" value={inv.business.email} onChange={e => updateField("business.email", e.target.value)} placeholder="email@example.com" /></FormField>
+          <FormField label="Email"><input style={componentStyles.input} type="email" value={inv.business.email} onChange={e => updateField("business.email", e.target.value)} placeholder="email@example.com" /></FormField>
         </div>
       </div>);
 
@@ -498,7 +499,7 @@ export default function InvoiceApp({ onBack, session }) {
         <StepTitle icon={Send} title="Review & Send" description="Review your invoice, save, and download or email." />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 12 }}>
           {[
-            { t: "Business", i: User, r: [["Name", inv.business.name], ["Phone", inv.business.phone], ["Gas Safe", inv.business.gasSafe]] },
+            { t: "Business", i: User, r: [["Name", inv.business.name], ["Phone", inv.business.phone], ["Email", inv.business.email]] },
             { t: "Customer", i: Building2, r: [["Name", inv.customer.name], ["Company", inv.customer.company], ["Email", inv.customer.email]] },
             { t: "Invoice", i: Receipt, r: [["Invoice #", inv.invoiceNo], ["Date", inv.invoiceDate], ["Due", inv.dueDate || "—"]] },
           ].map(card => (
@@ -577,13 +578,13 @@ export default function InvoiceApp({ onBack, session }) {
     <div style={s.root}>
       <div style={s.bgDots} />
       <div style={s.container}>
-        {/* Header */}
+        {/* Header — Mediumlink UK LTD branding */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => { saveInvoice(activeInvoice?.status || "draft"); setCurrentView("list"); }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: COLORS.accentBg, display: "flex", alignItems: "center", justifyContent: "center" }}><Receipt size={24} color={COLORS.accent} /></div>
             <div>
-              <h1 style={{ fontSize: 18, fontWeight: 800, color: COLORS.primary, margin: 0, letterSpacing: -0.5 }}>Invoice</h1>
-              <p style={{ fontSize: 11, color: COLORS.muted, margin: 0 }}>{inv.invoiceNo || "New Invoice"}</p>
+              <h1 style={{ fontSize: 18, fontWeight: 800, color: COLORS.accent, margin: 0, letterSpacing: -0.5 }}>Mediumlink UK Ltd</h1>
+              <p style={{ fontSize: 11, color: COLORS.muted, margin: 0 }}>Invoice · {inv.invoiceNo || "New"}</p>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

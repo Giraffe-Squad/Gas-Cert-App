@@ -45,35 +45,40 @@ export function generateInvoicePDF(invoice, download = true) {
   const fmt = (n) => "£" + parseFloat(n || 0).toFixed(2);
   const { subtotal, vatAmount, total } = calcInvoiceTotals(invoice);
 
-  // ─── Header bar ───
-  drawRect(0, 0, pw, 38, C.headerBg);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  setColor(C.white);
-  doc.text("INVOICE", ml, 18);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  setColor("#ffffffcc");
-  doc.text(`No: ${invoice.invoiceNo || "—"}`, ml, 26);
-  doc.text(`Date: ${invoice.invoiceDate || "—"}`, ml, 32);
+  // ─── Header bar with company name prominently ───
+  drawRect(0, 0, pw, 46, C.headerBg);
 
-  // Due date on right
+  // Big bold company name in orange — the main visual anchor
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  setColor(C.accent);
+  doc.text("MEDIUMLINK UK LTD", ml, 19);
+
+  // Orange accent line under company name
+  drawRect(ml, 23, 55, 1.2, C.accent);
+
+  // Smaller "INVOICE" label below
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  setColor("#ffffffaa");
+  doc.text("INVOICE", ml, 31);
+
+  // Invoice details
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  setColor("#ffffff80");
+  doc.text(`No: ${invoice.invoiceNo || "—"}`, ml, 38);
+  doc.text(`Date: ${invoice.invoiceDate || "—"}`, ml + 40, 38);
+
+  // Due date on right side
   if (invoice.dueDate) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     setColor(C.white);
-    doc.text(`Due: ${invoice.dueDate}`, pw - mr, 26, { align: "right" });
+    doc.text(`Due: ${invoice.dueDate}`, pw - mr, 31, { align: "right" });
   }
 
-  // Gas Safe on right
-  if (invoice.business?.gasSafe) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    setColor("#ffffffcc");
-    doc.text(`Gas Safe: ${invoice.business.gasSafe}`, pw - mr, 32, { align: "right" });
-  }
-
-  y = 48;
+  y = 56;
 
   // ─── Business / Customer columns ───
   const colW = (cw - 10) / 2;
@@ -98,7 +103,7 @@ export function generateInvoicePDF(invoice, download = true) {
   if (invoice.business?.email) { doc.text(invoice.business.email, ml, y); y += 4; }
 
   // TO
-  let y2 = 48;
+  let y2 = 56;
   const rightX = ml + colW + 10;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
@@ -230,7 +235,7 @@ export function generateInvoicePDF(invoice, download = true) {
   // ─── Footer ───
   doc.setFontSize(7);
   setColor(C.muted);
-  doc.text("Thank you for your business", pw / 2, ph - 10, { align: "center" });
+  doc.text("Thank you for your business  ·  Mediumlink UK Ltd", pw / 2, ph - 10, { align: "center" });
 
   if (download) {
     const name = `Invoice-${invoice.invoiceNo || invoice.id}.pdf`;
